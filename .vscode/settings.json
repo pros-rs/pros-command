@@ -3,5 +3,9 @@
     "rust-analyzer.cargo.target": "${workspaceFolder}/target/armv7a-vexos-eabi.json",
     "rust-analyzer.cargo.extraArgs": [
         "-Zbuild-std=core,alloc,compiler_builtins"
+    ],
+    "rust-analyzer.linkedProjects": [
+        "./Cargo.toml",
+        "./example/Cargo.toml",
     ]
 }
