@@ -151,6 +151,6 @@ impl Trigger {
     }
 
     pub fn button(controller: Controller, button: ControllerButton) -> Self {
-        Self::new(move || controller.get_button(button))
+        Self::new(move || controller.button(button))
     }
 }

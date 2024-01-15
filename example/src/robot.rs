@@ -30,7 +30,7 @@ impl Robot {
                 },
                 vec![],
             ))
-            .on_true(FunctionalCommand::instant(
+            .on_false(FunctionalCommand::instant(
                 || {
                     println!("Button A released");
                     Ok(())
