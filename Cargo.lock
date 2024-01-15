@@ -27,17 +27,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e1d90cd0b264dfdd8eb5bad0a2c217c1f88fa96a8573f40e7b12de23fb468f46"
 
 [[package]]
-name = "async-trait"
-version = "0.1.75"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fdf6721fb0140e4f897002dd086c06f6c27775df19cfe1fccb21181a48fd2c98"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.42",
-]
-
-[[package]]
 name = "autocfg"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -210,10 +199,11 @@ dependencies = [
 
 [[package]]
 name = "pros"
-version = "0.4.0"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "993613c6970cdd5cc7bc1d6c4dcca4c42b8548a82db45f761ad22f8bd3f73c31"
 dependencies = [
  "async-task",
- "async-trait",
  "dlmalloc",
  "futures",
  "hashbrown",
@@ -221,7 +211,7 @@ dependencies = [
  "no_std_io",
  "pros-sys",
  "slab",
- "snafu",
+ "snafu 0.7.5",
  "spin 0.9.8",
  "waker-fn",
 ]
@@ -232,7 +222,7 @@ version = "0.1.0"
 dependencies = [
  "hashbrown",
  "pros",
- "snafu",
+ "snafu 0.8.0",
 ]
 
 [[package]]
@@ -245,7 +235,9 @@ dependencies = [
 
 [[package]]
 name = "pros-sys"
-version = "0.4.1"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8d45ec3a39d3a31c0aff9c3ef14fdb0f5dd527425a991ec2df5cba6426f70d92"
 dependencies = [
  "cfg-if",
 ]
@@ -281,7 +273,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e4de37ad025c587a29e8f3f5605c00f70b98715ef90b9061a815b9e59e9042d6"
 dependencies = [
  "doc-comment",
- "snafu-derive",
+ "snafu-derive 0.7.5",
+]
+
+[[package]]
+name = "snafu"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d342c51730e54029130d7dc9fd735d28c4cd360f1368c01981d4f03ff207f096"
+dependencies = [
+ "snafu-derive 0.8.0",
 ]
 
 [[package]]
@@ -294,6 +295,18 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 1.0.109",
+]
+
+[[package]]
+name = "snafu-derive"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "080c44971436b1af15d6f61ddd8b543995cf63ab8e677d46b00cc06f4ef267a0"
+dependencies = [
+ "heck",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.42",
 ]
 
 [[package]]
