@@ -2,19 +2,16 @@
 
 extern crate alloc;
 
-use alloc::{collections::BTreeSet, rc::Rc, vec, vec::Vec};
+use alloc::{rc::Rc, vec::Vec};
 use core::{
-    any::Any,
-    borrow::{Borrow, BorrowMut},
     cell::{Cell, RefCell},
-    fmt::{Debug, Formatter},
-    hash::{self, BuildHasher, Hash},
+    hash::Hash,
     ops::Deref,
 };
 
 use command::{Command, InterruptionBehavior};
 use event::EventLoop;
-use hashbrown::{hash_map::DefaultHashBuilder, HashMap, HashSet};
+use hashbrown::{HashMap, HashSet};
 use pros::{competition::get_status, prelude::*};
 use snafu::Snafu;
 use subsystem::Subsystem;

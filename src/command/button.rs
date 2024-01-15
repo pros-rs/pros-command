@@ -1,9 +1,9 @@
 use alloc::rc::Rc;
 use core::cell::RefCell;
 
-use pros::controller::{self, Controller, ControllerButton};
+use pros::controller::{Controller, ControllerButton};
 
-use super::{Command, CommandRefExt};
+use super::CommandRefExt;
 use crate::{event::EventLoop, CommandRef, CommandScheduler};
 
 pub struct Trigger {

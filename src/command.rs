@@ -1,7 +1,7 @@
 use alloc::{boxed::Box, rc::Rc, vec::Vec};
 use core::cell::RefCell;
 
-use crate::{subsystem::Subsystem, CommandScheduler, SubsystemRef};
+use crate::{CommandScheduler, SubsystemRef};
 
 pub mod button;
 

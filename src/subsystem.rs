@@ -1,5 +1,5 @@
 use alloc::{boxed::Box, rc::Rc, vec};
-use core::{any::Any, cell::RefCell, fmt::Debug};
+use core::{cell::RefCell, fmt::Debug};
 
 use crate::{
     command::{Command, FunctionalCommand},
