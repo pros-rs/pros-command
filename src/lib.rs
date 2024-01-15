@@ -14,7 +14,7 @@ use core::{
 use command::{Command, InterruptionBehavior};
 use event::EventLoop;
 use hashbrown::{HashMap, HashSet};
-use pros::prelude::*;
+use pros::{competition::get_status, prelude::*};
 use snafu::Snafu;
 use subsystem::Subsystem;
 
@@ -296,7 +296,7 @@ impl CommandScheduler {
             (*button_loop).borrow_mut().poll();
 
             state.in_run_loop.set(true);
-            let disabled = pros::competition::is_disabled();
+            let disabled = get_status().disabled();
 
             let scheduled_commands = state
                 .scheduled_commands

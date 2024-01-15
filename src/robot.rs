@@ -21,9 +21,10 @@ enum RobotState {
 
 impl RobotState {
     pub fn current() -> Self {
-        if pros::competition::is_autonomous() {
+        let status = pros::competition::get_status();
+        if status.autonomous() {
             Self::Autonomous
-        } else if pros::competition::is_connected() {
+        } else if status.connected() {
             Self::Opcontrol
         } else {
             Self::Disabled
