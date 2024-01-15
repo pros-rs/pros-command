@@ -1,4 +1,5 @@
-use alloc::vec;
+use alloc::{rc::Rc, vec};
+use core::cell::RefCell;
 
 use pros::{
     controller::{Controller, ControllerButton},
@@ -7,22 +8,31 @@ use pros::{
 use pros_command::{
     command::{button::Trigger, FunctionalCommand},
     robot::ScheduledRobot,
+    subsystem::Subsystem,
     CommandScheduler,
 };
 
+use crate::{commands::DriveWithJoystickCommand, subsystems::drivetrain::Drivetrain};
+
 pub struct Robot {
-    pub controller: Controller,
+    drivetrain: Rc<RefCell<Drivetrain>>,
 }
 
 impl Robot {
-    pub fn new() -> Self {
-        Self {
-            controller: Controller::Master,
-        }
+    pub fn new() -> pros::Result<Self> {
+        Ok(Self {
+            drivetrain: Drivetrain::new()?.register(),
+        })
     }
 
     pub fn configure_button_bindings(&mut self) {
-        Trigger::button(self.controller, ControllerButton::A)
+        CommandScheduler::set_default_command(
+            &self.drivetrain,
+            DriveWithJoystickCommand::new(self.drivetrain.clone(), Controller::Master),
+        )
+        .unwrap();
+
+        Trigger::button(Controller::Master, ControllerButton::A)
             .on_true(FunctionalCommand::instant(
                 || {
                     println!("Button A pressed");

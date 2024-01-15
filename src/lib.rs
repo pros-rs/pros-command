@@ -4,16 +4,17 @@ extern crate alloc;
 
 use alloc::{collections::BTreeSet, rc::Rc, vec, vec::Vec};
 use core::{
+    any::Any,
     borrow::{Borrow, BorrowMut},
     cell::{Cell, RefCell},
-    fmt::Formatter,
-    hash::Hash,
+    fmt::{Debug, Formatter},
+    hash::{self, BuildHasher, Hash},
     ops::Deref,
 };
 
 use command::{Command, InterruptionBehavior};
 use event::EventLoop;
-use hashbrown::{HashMap, HashSet};
+use hashbrown::{hash_map::DefaultHashBuilder, HashMap, HashSet};
 use pros::{competition::get_status, prelude::*};
 use snafu::Snafu;
 use subsystem::Subsystem;
@@ -23,8 +24,8 @@ pub mod event;
 pub mod robot;
 pub mod subsystem;
 
-#[derive(Clone)]
-pub struct SubsystemRef(Rc<RefCell<dyn Subsystem>>);
+#[derive(Clone, Debug)]
+pub struct SubsystemRef(pub Rc<RefCell<dyn Subsystem>>);
 
 impl PartialEq for SubsystemRef {
     fn eq(&self, other: &Self) -> bool {
@@ -35,7 +36,7 @@ impl Eq for SubsystemRef {}
 
 impl Hash for SubsystemRef {
     fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
-        Rc::as_ptr(&self.0).hash(state);
+        (Rc::as_ptr(&self.0) as *const ()).hash(state);
     }
 }
 
@@ -60,7 +61,7 @@ impl Deref for SubsystemRef {
 }
 
 #[derive(Clone)]
-pub struct CommandRef(Rc<RefCell<dyn Command>>);
+pub struct CommandRef(pub Rc<RefCell<dyn Command>>);
 
 impl PartialEq for CommandRef {
     fn eq(&self, other: &Self) -> bool {
@@ -71,7 +72,7 @@ impl Eq for CommandRef {}
 
 impl Hash for CommandRef {
     fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
-        Rc::as_ptr(&self.0).hash(state);
+        (Rc::as_ptr(&self.0) as *const ()).hash(state);
     }
 }
 

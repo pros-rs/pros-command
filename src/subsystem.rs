@@ -1,5 +1,5 @@
 use alloc::{boxed::Box, rc::Rc, vec};
-use core::cell::RefCell;
+use core::{any::Any, cell::RefCell, fmt::Debug};
 
 use crate::{
     command::{Command, FunctionalCommand},
@@ -7,7 +7,7 @@ use crate::{
 };
 
 /// A collection of robot parts and other hardware that act together as a whole.
-pub trait Subsystem {
+pub trait Subsystem: Debug {
     /// This method will be called once per scheduler run
     fn periodic(&mut self) {}
     /// This method will be called once per scheduler run, but only during simulation
@@ -16,11 +16,11 @@ pub trait Subsystem {
         None
     }
 
-    fn register(self)
+    fn register(self) -> Rc<RefCell<Self>>
     where
         Self: Sized + 'static,
     {
-        CommandScheduler::register(self);
+        CommandScheduler::register(self)
     }
 }
 

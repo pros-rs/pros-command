@@ -3,21 +3,26 @@
 
 extern crate alloc;
 
-use pros::{prelude::*, task};
+use pros::prelude::*;
 use robot::Robot;
 
-mod robot;
+pub mod commands;
+pub mod robot;
+pub mod subsystems;
 
-#[derive(Default)]
 struct RobotBase;
 
-impl SyncRobot for RobotBase {
-    fn opcontrol(&mut self) -> pros::Result {
-        let mut robot = Robot::new();
-        robot.configure_button_bindings();
-        pros_command::robot::start_robot(robot).unwrap();
-        Ok(())
+impl Default for RobotBase {
+    fn default() -> Self {
+        pros::task::spawn(|| {
+            let mut robot = Robot::new().unwrap();
+            robot.configure_button_bindings();
+            pros_command::robot::start_robot(robot).unwrap();
+        });
+        Self
     }
 }
+
+impl SyncRobot for RobotBase {}
 
 sync_robot!(RobotBase);
