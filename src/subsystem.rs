@@ -1,5 +1,6 @@
 use alloc::{boxed::Box, rc::Rc, vec};
 use core::{cell::RefCell, fmt::Debug};
+use pros::prelude::*;
 
 use crate::{
     command::{Command, FunctionalCommand},
@@ -28,17 +29,17 @@ pub trait SubsystemRefExt<T>
 where
     T: Subsystem,
 {
-    fn run_once(&self, action: impl FnMut() -> pros::Result + 'static) -> FunctionalCommand;
-    fn run(&self, action: impl FnMut() -> pros::Result + 'static) -> FunctionalCommand;
+    fn run_once(&self, action: impl FnMut() -> Result + 'static) -> FunctionalCommand;
+    fn run(&self, action: impl FnMut() -> Result + 'static) -> FunctionalCommand;
     fn start_end(
         &self,
-        start: impl FnMut() -> pros::Result + 'static,
-        end: impl FnMut(bool) -> pros::Result + 'static,
+        start: impl FnMut() -> Result + 'static,
+        end: impl FnMut(bool) -> Result + 'static,
     ) -> FunctionalCommand;
     fn run_end(
         &self,
-        run: impl FnMut() -> pros::Result + 'static,
-        end: impl FnMut(bool) -> pros::Result + 'static,
+        run: impl FnMut() -> Result + 'static,
+        end: impl FnMut(bool) -> Result + 'static,
     ) -> FunctionalCommand;
 }
 
@@ -46,23 +47,23 @@ impl<T> SubsystemRefExt<T> for Rc<RefCell<T>>
 where
     T: Subsystem + 'static,
 {
-    fn run_once(&self, action: impl FnMut() -> pros::Result + 'static) -> FunctionalCommand {
+    fn run_once(&self, action: impl FnMut() -> Result + 'static) -> FunctionalCommand {
         FunctionalCommand::instant(action, vec![SubsystemRef(self.clone())])
     }
-    fn run(&self, action: impl FnMut() -> pros::Result + 'static) -> FunctionalCommand {
+    fn run(&self, action: impl FnMut() -> Result + 'static) -> FunctionalCommand {
         FunctionalCommand::run(action, vec![SubsystemRef(self.clone())])
     }
     fn start_end(
         &self,
-        start: impl FnMut() -> pros::Result + 'static,
-        end: impl FnMut(bool) -> pros::Result + 'static,
+        start: impl FnMut() -> Result + 'static,
+        end: impl FnMut(bool) -> Result + 'static,
     ) -> FunctionalCommand {
         FunctionalCommand::start_end(start, end, vec![SubsystemRef(self.clone())])
     }
     fn run_end(
         &self,
-        run: impl FnMut() -> pros::Result + 'static,
-        end: impl FnMut(bool) -> pros::Result + 'static,
+        run: impl FnMut() -> Result + 'static,
+        end: impl FnMut(bool) -> Result + 'static,
     ) -> FunctionalCommand {
         FunctionalCommand::run_end(run, end, vec![SubsystemRef(self.clone())])
     }

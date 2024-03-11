@@ -9,7 +9,7 @@ edition = "2021"
 
 [dependencies]
 hashbrown = "0.14.3"
-pros = { version = "0.6.0" }
+pros = { version = "0.8.0", features = ["sync"] }
 snafu = { version = "0.8.0", default-features = false, features = [
     "unstable-core-error",
 ] }

@@ -1,14 +1,14 @@
 use alloc::rc::Rc;
 use core::cell::RefCell;
+use pros::devices::Controller;
+use pros::devices::controller::ControllerButton;
+use pros::prelude::*;
 
-use pros::controller::{Controller, ControllerButton};
-
-use super::CommandRefExt;
-use crate::{event::EventLoop, CommandRef, CommandScheduler};
+use crate::{event::EventLoop, CommandRef, CommandScheduler, command::CommandRefExt};
 
 pub struct Trigger {
     event_loop: Rc<RefCell<EventLoop>>,
-    condition: Rc<dyn Fn() -> bool>,
+    condition: Rc<dyn Fn() -> Result<bool>>,
 }
 
 impl Trigger {
@@ -29,10 +29,10 @@ impl Trigger {
         }
     }
 
-    pub fn on_true(self, command: impl Into<CommandRef>) -> Self {
+    pub fn on_true(self, command: impl Into<CommandRef>) -> Result<Self> {
         let command = command.into();
         let condition = self.condition.clone();
-        let mut pressed_last = condition();
+        let mut pressed_last = condition()?;
         self.event_loop.borrow_mut().bind(move || {
             let pressed = condition();
             if !pressed_last && pressed {
@@ -150,7 +150,7 @@ impl Trigger {
         Self::new(move || !condition())
     }
 
-    pub fn button(controller: Controller, button: ControllerButton) -> Self {
-        Self::new(move || controller.button(button))
+    pub fn button(controller: Controller, button: ControllerButton) -> Result<Self> {
+        Ok(Self::new(move || controller.button(button)))
     }
 }

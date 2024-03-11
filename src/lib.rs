@@ -12,7 +12,10 @@ use core::{
 use command::{Command, InterruptionBehavior};
 use event::EventLoop;
 use hashbrown::{HashMap, HashSet};
-use pros::{competition::get_status, prelude::*};
+use pros::core::os_task_local;
+use pros::devices::competition;
+use pros::devices::competition::CompetitionMode;
+use pros::prelude::*;
 use snafu::Snafu;
 use subsystem::Subsystem;
 
@@ -20,6 +23,7 @@ pub mod command;
 pub mod event;
 pub mod robot;
 pub mod subsystem;
+pub mod controller;
 
 #[derive(Clone, Debug)]
 pub struct SubsystemRef(pub Rc<RefCell<dyn Subsystem>>);
@@ -127,7 +131,7 @@ impl CommandSchedulerState {
         &self,
         command: CommandRef,
         requirements: HashSet<SubsystemRef>,
-    ) -> pros::Result {
+    ) -> Result {
         self.requirements
             .borrow_mut()
             .extend(requirements.into_iter().map(|r| (r, command.clone())));
@@ -138,7 +142,7 @@ impl CommandSchedulerState {
         Ok(())
     }
 
-    fn cancel(&self, command: &CommandRef) -> pros::Result {
+    fn cancel(&self, command: &CommandRef) -> Result {
         if self.ending_commands.borrow().contains(command) {
             return Ok(());
         }
@@ -169,7 +173,7 @@ impl CommandSchedulerState {
         Ok(())
     }
 
-    fn schedule_now(&self, command: CommandRef) -> pros::Result {
+    fn schedule_now(&self, command: CommandRef) -> Result {
         if self.is_scheduled(&command) {
             return Ok(());
         }
@@ -221,7 +225,7 @@ impl CommandScheduler {
     }
 
     /// Schedule a command to run.
-    pub fn schedule(command: Rc<RefCell<dyn Command>>) -> pros::Result {
+    pub fn schedule(command: Rc<RefCell<dyn Command>>) -> Result {
         STATE.with(|state| {
             let command = CommandRef(command);
             if state.in_run_loop.get() {
@@ -233,14 +237,14 @@ impl CommandScheduler {
         })
     }
 
-    pub fn cancel(command: Rc<RefCell<dyn Command>>) -> pros::Result {
+    pub fn cancel(command: Rc<RefCell<dyn Command>>) -> Result {
         STATE.with(|state| state.cancel(&CommandRef(command)))
     }
 
     pub fn set_default_command<S>(
         subsystem: &Rc<RefCell<S>>,
         command: impl Command + 'static,
-    ) -> Result<(), SetDefaultCommandError>
+    ) -> core::result::Result<(), SetDefaultCommandError>
     where
         S: Subsystem + 'static,
     {
@@ -280,7 +284,7 @@ impl CommandScheduler {
         })
     }
 
-    pub fn run() -> pros::Result {
+    pub fn run() -> Result {
         STATE.with(|state| {
             for subsystem in state.subsystems.borrow().keys() {
                 let mut subsystem = (*subsystem.0).borrow_mut();
@@ -294,7 +298,7 @@ impl CommandScheduler {
             (*button_loop).borrow_mut().poll();
 
             state.in_run_loop.set(true);
-            let disabled = get_status().disabled();
+            let comp_mode = competition::mode();
 
             let scheduled_commands = state
                 .scheduled_commands
@@ -305,7 +309,7 @@ impl CommandScheduler {
 
             for command in scheduled_commands {
                 let mut command_ref = (*command.0).borrow_mut();
-                if disabled && !command_ref.runs_when_disabled() {
+                if comp_mode == CompetitionMode::Disabled && !command_ref.runs_when_disabled() {
                     state.cancel(&command)?;
                 }
 
@@ -352,7 +356,7 @@ impl CommandScheduler {
         command.get_requirements().iter().cloned().collect()
     }
 
-    pub fn cancel_all() -> pros::Result {
+    pub fn cancel_all() -> Result {
         STATE.with(|state| {
             let scheduled_commands = state
                 .scheduled_commands

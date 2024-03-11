@@ -3,6 +3,7 @@
 
 extern crate alloc;
 
+use pros::core::task;
 use pros::prelude::*;
 use robot::Robot;
 
@@ -14,7 +15,7 @@ struct RobotBase;
 
 impl Default for RobotBase {
     fn default() -> Self {
-        pros::task::spawn(|| {
+        task::spawn(|| {
             let mut robot = Robot::new().unwrap();
             robot.configure_button_bindings();
             pros_command::robot::start_robot(robot).unwrap();
