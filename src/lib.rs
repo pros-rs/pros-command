@@ -16,8 +16,9 @@ use pros::core::os_task_local;
 use pros::devices::competition;
 use pros::devices::competition::CompetitionMode;
 use pros::prelude::*;
-use snafu::Snafu;
+use snafu::{OptionExt, Snafu};
 use subsystem::Subsystem;
+use crate::SetDefaultCommandError::NotRegistered;
 
 pub mod command;
 pub mod event;
@@ -26,34 +27,34 @@ pub mod subsystem;
 pub mod controller;
 
 #[derive(Clone, Debug)]
-pub struct SubsystemRef(pub Rc<RefCell<dyn Subsystem>>);
+pub struct AnySubsystem(pub Rc<RefCell<dyn Subsystem>>);
 
-impl PartialEq for SubsystemRef {
+impl PartialEq for AnySubsystem {
     fn eq(&self, other: &Self) -> bool {
         Rc::ptr_eq(&self.0, &other.0)
     }
 }
-impl Eq for SubsystemRef {}
+impl Eq for AnySubsystem {}
 
-impl Hash for SubsystemRef {
+impl Hash for AnySubsystem {
     fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
         (Rc::as_ptr(&self.0) as *const ()).hash(state);
     }
 }
 
-impl From<Rc<RefCell<dyn Subsystem>>> for SubsystemRef {
+impl From<Rc<RefCell<dyn Subsystem>>> for AnySubsystem {
     fn from(subsystem: Rc<RefCell<dyn Subsystem>>) -> Self {
         Self(subsystem)
     }
 }
 
-impl<T: Subsystem + 'static> From<T> for SubsystemRef {
+impl<T: Subsystem + 'static> From<T> for AnySubsystem {
     fn from(subsystem: T) -> Self {
         Self(Rc::new(RefCell::new(subsystem)))
     }
 }
 
-impl Deref for SubsystemRef {
+impl Deref for AnySubsystem {
     type Target = Rc<RefCell<dyn Subsystem>>;
 
     fn deref(&self) -> &Self::Target {
@@ -62,34 +63,34 @@ impl Deref for SubsystemRef {
 }
 
 #[derive(Clone)]
-pub struct CommandRef(pub Rc<RefCell<dyn Command>>);
+pub struct AnyCommand(pub Rc<RefCell<dyn Command>>);
 
-impl PartialEq for CommandRef {
+impl PartialEq for AnyCommand {
     fn eq(&self, other: &Self) -> bool {
         Rc::ptr_eq(&self.0, &other.0)
     }
 }
-impl Eq for CommandRef {}
+impl Eq for AnyCommand {}
 
-impl Hash for CommandRef {
+impl Hash for AnyCommand {
     fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
         (Rc::as_ptr(&self.0) as *const ()).hash(state);
     }
 }
 
-impl From<Rc<RefCell<dyn Command>>> for CommandRef {
+impl From<Rc<RefCell<dyn Command>>> for AnyCommand {
     fn from(command: Rc<RefCell<dyn Command>>) -> Self {
         Self(command)
     }
 }
 
-impl<T: Command + 'static> From<T> for CommandRef {
+impl<T: Command + 'static> From<T> for AnyCommand {
     fn from(subsystem: T) -> Self {
         Self(Rc::new(RefCell::new(subsystem)))
     }
 }
 
-impl Deref for CommandRef {
+impl Deref for AnyCommand {
     type Target = Rc<RefCell<dyn Command>>;
 
     fn deref(&self) -> &Self::Target {
@@ -99,38 +100,38 @@ impl Deref for CommandRef {
 
 #[derive(Debug, Snafu)]
 pub enum SetDefaultCommandError {
-    #[snafu(display("Default commands must require their subsystem."))]
+    /// Default commands must require their subsystem
     MustRequireSubsystem,
-    #[snafu(display("Cannot set the default command on a subsystem that is not registered."))]
+    /// Cannot set the default command on a subsystem that is not registered.
     NotRegistered,
 }
 
 #[derive(Default)]
 struct CommandSchedulerState {
-    subsystems: RefCell<HashMap<SubsystemRef, Option<CommandRef>>>,
+    subsystems: RefCell<HashMap<AnySubsystem, Option<AnyCommand>>>,
     in_run_loop: Cell<bool>,
-    to_schedule: RefCell<Vec<CommandRef>>,
-    to_cancel: RefCell<Vec<CommandRef>>,
-    scheduled_commands: RefCell<HashSet<CommandRef>>,
-    requirements: RefCell<HashMap<SubsystemRef, CommandRef>>,
+    to_schedule: RefCell<Vec<AnyCommand>>,
+    to_cancel: RefCell<Vec<AnyCommand>>,
+    scheduled_commands: RefCell<HashSet<AnyCommand>>,
+    requirements: RefCell<HashMap<AnySubsystem, AnyCommand>>,
     button_loop: Rc<RefCell<EventLoop>>,
-    ending_commands: RefCell<HashSet<CommandRef>>,
+    ending_commands: RefCell<HashSet<AnyCommand>>,
 }
 
 impl CommandSchedulerState {
     #[inline]
-    fn is_scheduled(&self, command: &CommandRef) -> bool {
+    fn is_scheduled(&self, command: &AnyCommand) -> bool {
         self.scheduled_commands.borrow().contains(command)
     }
 
-    fn requiring(&self, subsystem: &SubsystemRef) -> Option<CommandRef> {
+    fn requiring(&self, subsystem: &AnySubsystem) -> Option<AnyCommand> {
         self.requirements.borrow().get(subsystem).cloned()
     }
 
     fn init_command(
         &self,
-        command: CommandRef,
-        requirements: HashSet<SubsystemRef>,
+        command: AnyCommand,
+        requirements: HashSet<AnySubsystem>,
     ) -> Result {
         self.requirements
             .borrow_mut()
@@ -142,7 +143,7 @@ impl CommandSchedulerState {
         Ok(())
     }
 
-    fn cancel(&self, command: &CommandRef) -> Result {
+    fn cancel(&self, command: &AnyCommand) -> Result {
         if self.ending_commands.borrow().contains(command) {
             return Ok(());
         }
@@ -173,7 +174,7 @@ impl CommandSchedulerState {
         Ok(())
     }
 
-    fn schedule_now(&self, command: CommandRef) -> Result {
+    fn schedule_now(&self, command: AnyCommand) -> Result {
         if self.is_scheduled(&command) {
             return Ok(());
         }
@@ -216,10 +217,14 @@ impl CommandScheduler {
     pub fn register<S: Subsystem + 'static>(subsystem: S) -> Rc<RefCell<S>> {
         let subsystem = Rc::new(RefCell::new(subsystem));
         STATE.with(|state| {
+            let subsystem_ref = AnySubsystem(subsystem.clone());
             state
                 .subsystems
                 .borrow_mut()
-                .insert(SubsystemRef(subsystem.clone()), None);
+                .insert(subsystem_ref.clone(), None);
+            if let Some(default_command) = subsystem.borrow().default_command(subsystem_ref.clone()) {
+                CommandScheduler::set_default_command(&subsystem_ref, default_command);
+            }
         });
         subsystem
     }
@@ -227,7 +232,7 @@ impl CommandScheduler {
     /// Schedule a command to run.
     pub fn schedule(command: Rc<RefCell<dyn Command>>) -> Result {
         STATE.with(|state| {
-            let command = CommandRef(command);
+            let command = AnyCommand(command);
             if state.in_run_loop.get() {
                 state.to_schedule.borrow_mut().push(command);
                 return Ok(());
@@ -238,32 +243,28 @@ impl CommandScheduler {
     }
 
     pub fn cancel(command: Rc<RefCell<dyn Command>>) -> Result {
-        STATE.with(|state| state.cancel(&CommandRef(command)))
+        STATE.with(|state| state.cancel(&AnyCommand(command)))
     }
 
-    pub fn set_default_command<S>(
-        subsystem: &Rc<RefCell<S>>,
-        command: impl Command + 'static,
-    ) -> core::result::Result<(), SetDefaultCommandError>
-    where
-        S: Subsystem + 'static,
-    {
+    pub fn set_default_command(
+        subsystem: &AnySubsystem,
+        command: AnyCommand,
+    ) -> core::result::Result<(), SetDefaultCommandError> {
         STATE.with(|state| {
-            let requirements = CommandScheduler::requirements_of(&command);
-            if !requirements.contains(&SubsystemRef(subsystem.clone())) {
-                return Err(SetDefaultCommandError::MustRequireSubsystem);
+            let requirements = CommandScheduler::requirements_of(&*command.borrow());
+            if !requirements.contains(subsystem) {
+                return MustRequireSubsystemSnafu.fail();
             }
 
             // if command.get_interruption_behavior() == InterruptionBehavior::CancelIncoming {
             //     weird but ok i guess
             // }
 
-            let command = CommandRef(Rc::new(RefCell::new(command)));
             state
                 .subsystems
                 .borrow_mut()
-                .get_mut(&SubsystemRef(subsystem.clone()))
-                .unwrap()
+                .get_mut(subsystem)
+                .context(NotRegisteredSnafu)?
                 .replace(command);
 
             Ok(())
@@ -278,7 +279,7 @@ impl CommandScheduler {
             let command = state
                 .subsystems
                 .borrow_mut()
-                .get_mut(&SubsystemRef(subsystem.clone()))?
+                .get_mut(&AnySubsystem(subsystem.clone()))?
                 .take();
             command.map(|c| c.0)
         })
@@ -286,16 +287,16 @@ impl CommandScheduler {
 
     pub fn run() -> Result {
         STATE.with(|state| {
-            for subsystem in state.subsystems.borrow().keys() {
-                let mut subsystem = (*subsystem.0).borrow_mut();
-                subsystem.periodic();
+            for subsystem_ctx in state.subsystems.borrow().keys() {
+                let mut subsystem = (*subsystem_ctx.0).borrow_mut();
+                subsystem.periodic(subsystem_ctx.clone());
                 if robot::is_sim() {
-                    subsystem.sim_periodic();
+                    subsystem.sim_periodic(subsystem_ctx.clone());
                 }
             }
 
             let button_loop = state.button_loop.clone();
-            (*button_loop).borrow_mut().poll();
+            (*button_loop).borrow_mut().poll()?;
 
             state.in_run_loop.set(true);
             let comp_mode = competition::mode();
@@ -352,7 +353,7 @@ impl CommandScheduler {
         })
     }
 
-    fn requirements_of(command: &dyn Command) -> HashSet<SubsystemRef> {
+    fn requirements_of(command: &dyn Command) -> HashSet<AnySubsystem> {
         command.get_requirements().iter().cloned().collect()
     }
 
@@ -378,6 +379,6 @@ impl CommandScheduler {
     }
 
     pub fn is_scheduled(command: &Rc<RefCell<dyn Command>>) -> bool {
-        STATE.with(|state| state.is_scheduled(&CommandRef(command.clone())))
+        STATE.with(|state| state.is_scheduled(&AnyCommand(command.clone())))
     }
 }

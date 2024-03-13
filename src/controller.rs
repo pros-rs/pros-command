@@ -4,11 +4,11 @@ use pros::devices::Controller;
 use pros::devices::controller::ControllerButton;
 use pros::prelude::*;
 
-use crate::{event::EventLoop, CommandRef, CommandScheduler, command::CommandRefExt};
+use crate::{event::EventLoop, AnyCommand, CommandScheduler, command::CommandRefExt};
 
 pub struct Trigger {
     event_loop: Rc<RefCell<EventLoop>>,
-    condition: Rc<dyn Fn() -> Result<bool>>,
+    condition: Rc<dyn Fn() -> bool>,
 }
 
 impl Trigger {
@@ -29,21 +29,22 @@ impl Trigger {
         }
     }
 
-    pub fn on_true(self, command: impl Into<CommandRef>) -> Result<Self> {
+    pub fn on_true(self, command: impl Into<AnyCommand>) -> Self {
         let command = command.into();
         let condition = self.condition.clone();
-        let mut pressed_last = condition()?;
+        let mut pressed_last = condition();
         self.event_loop.borrow_mut().bind(move || {
             let pressed = condition();
             if !pressed_last && pressed {
                 command.schedule().unwrap();
             }
             pressed_last = pressed;
+            Ok(())
         });
         self
     }
 
-    pub fn on_false(self, command: impl Into<CommandRef>) -> Self {
+    pub fn on_false(self, command: impl Into<AnyCommand>) -> Self {
         let command = command.into();
         let condition = self.condition.clone();
         let mut pressed_last = condition();
@@ -53,11 +54,12 @@ impl Trigger {
                 command.schedule().unwrap();
             }
             pressed_last = pressed;
+            Ok(())
         });
         self
     }
 
-    pub fn while_true(self, command: impl Into<CommandRef>) -> Self {
+    pub fn while_true(self, command: impl Into<AnyCommand>) -> Self {
         let command = command.into();
         let condition = self.condition.clone();
         let mut pressed_last = condition();
@@ -70,11 +72,12 @@ impl Trigger {
                 command.cancel().unwrap();
             }
             pressed_last = pressed;
+            Ok(())
         });
         self
     }
 
-    pub fn while_false(self, command: impl Into<CommandRef>) -> Self {
+    pub fn while_false(self, command: impl Into<AnyCommand>) -> Self {
         let command = command.into();
         let condition = self.condition.clone();
         let mut pressed_last = condition();
@@ -87,11 +90,12 @@ impl Trigger {
                 command.cancel().unwrap();
             }
             pressed_last = pressed;
+            Ok(())
         });
         self
     }
 
-    pub fn toggle_on_true(self, command: impl Into<CommandRef>) -> Self {
+    pub fn toggle_on_true(self, command: impl Into<AnyCommand>) -> Self {
         let command = command.into();
         let condition = self.condition.clone();
         let mut pressed_last = condition();
@@ -106,11 +110,12 @@ impl Trigger {
                 }
             }
             pressed_last = pressed;
+            Ok(())
         });
         self
     }
 
-    pub fn toggle_on_false(self, command: impl Into<CommandRef>) -> Self {
+    pub fn toggle_on_false(self, command: impl Into<AnyCommand>) -> Self {
         let command = command.into();
         let condition = self.condition.clone();
         let mut pressed_last = condition();
@@ -125,6 +130,7 @@ impl Trigger {
                 }
             }
             pressed_last = pressed;
+            Ok(())
         });
         self
     }
@@ -151,6 +157,6 @@ impl Trigger {
     }
 
     pub fn button(controller: Controller, button: ControllerButton) -> Result<Self> {
-        Ok(Self::new(move || controller.button(button)))
+        Ok(Self::new(move || controller.button(button).expect("Expected controller to be available")))
     }
 }

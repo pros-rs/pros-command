@@ -2,11 +2,11 @@ use alloc::{boxed::Box, rc::Rc, vec::Vec};
 use core::cell::RefCell;
 use pros::prelude::*;
 
-use crate::{CommandScheduler, SubsystemRef};
+use crate::{CommandScheduler, AnySubsystem};
 
 /// An action the robot can perform. Runs when scheduled, until it is interrupted or it finishes.
 pub trait Command {
-    fn get_requirements(&self) -> &[SubsystemRef];
+    fn get_requirements(&self) -> &[AnySubsystem];
 
     /// The initial subroutine of a command. Called once when the command is initially scheduled.
     fn initialize(&mut self) -> Result {
@@ -20,7 +20,7 @@ pub trait Command {
         Ok(())
     }
 
-    fn is_finished(&mut self) -> Result<bool> {
+    fn is_finished(&self) -> Result<bool> {
         Ok(false)
     }
 
@@ -64,8 +64,8 @@ pub struct FunctionalCommand {
     on_init: Box<dyn FnMut() -> Result>,
     on_execute: Box<dyn FnMut() -> Result>,
     on_end: Box<dyn FnMut(bool) -> Result>,
-    is_finished: Box<dyn FnMut() -> Result<bool>>,
-    requirements: Vec<SubsystemRef>,
+    is_finished: Box<dyn Fn() -> Result<bool>>,
+    requirements: Vec<AnySubsystem>,
 }
 
 impl FunctionalCommand {
@@ -73,8 +73,8 @@ impl FunctionalCommand {
         on_init: impl FnMut() -> Result + 'static,
         on_execute: impl FnMut() -> Result + 'static,
         on_end: impl FnMut(bool) -> Result + 'static,
-        is_finished: impl FnMut() -> Result<bool> + 'static,
-        requirements: Vec<SubsystemRef>,
+        is_finished: impl Fn() -> Result<bool> + 'static,
+        requirements: Vec<AnySubsystem>,
     ) -> Self {
         Self {
             on_init: Box::new(on_init),
@@ -84,46 +84,10 @@ impl FunctionalCommand {
             requirements,
         }
     }
-
-    pub fn instant(
-        on_init: impl FnMut() -> Result + 'static,
-        requirements: Vec<SubsystemRef>,
-    ) -> Self {
-        Self::new(on_init, || Ok(()), |_| Ok(()), || Ok(true), requirements)
-    }
-
-    pub fn run(
-        on_execute: impl FnMut() -> Result + 'static,
-        requirements: Vec<SubsystemRef>,
-    ) -> Self {
-        Self::new(
-            || Ok(()),
-            on_execute,
-            |_| Ok(()),
-            || Ok(false),
-            requirements,
-        )
-    }
-
-    pub fn start_end(
-        on_init: impl FnMut() -> Result + 'static,
-        on_end: impl FnMut(bool) -> Result + 'static,
-        requirements: Vec<SubsystemRef>,
-    ) -> Self {
-        Self::new(on_init, || Ok(()), on_end, || Ok(false), requirements)
-    }
-
-    pub fn run_end(
-        on_execute: impl FnMut() -> Result + 'static,
-        on_end: impl FnMut(bool) -> Result + 'static,
-        requirements: Vec<SubsystemRef>,
-    ) -> Self {
-        Self::new(|| Ok(()), on_execute, on_end, || Ok(false), requirements)
-    }
 }
 
 impl Command for FunctionalCommand {
-    fn get_requirements(&self) -> &[SubsystemRef] {
+    fn get_requirements(&self) -> &[AnySubsystem] {
         &self.requirements
     }
 
@@ -139,7 +103,65 @@ impl Command for FunctionalCommand {
         (self.on_end)(interrupted)
     }
 
-    fn is_finished(&mut self) -> Result<bool> {
+    fn is_finished(&self) -> Result<bool> {
         (self.is_finished)()
     }
+}
+
+#[macro_export]
+macro_rules! run_once {
+    ($on_init:block) => {
+        FunctionalCommand::new(move || $on_init, || Ok(()), |_| Ok(()), || Ok(true), vec![])
+    };
+    ($on_init:block, $($requirement:expr),+ $(,)?) => {
+        FunctionalCommand::new(move || $on_init, || Ok(()), |_| Ok(()), || Ok(true), vec![$($requirement),+])
+    };
+}
+
+#[macro_export]
+macro_rules! run {
+    ($on_execute:block) => {
+        FunctionalCommand::new(
+            || Ok(()),
+            move || $on_execute,
+            |_| Ok(()),
+            || Ok(false),
+            vec![],
+        )
+    };
+    ($on_execute:block, $($requirement:expr),+ $(,)?) => {
+        FunctionalCommand::new(
+            || Ok(()),
+            move || $on_execute,
+            |_| Ok(()),
+            || Ok(false),
+            vec![$($requirement),+],
+        )
+    };
+}
+
+#[macro_export]
+macro_rules! start_end {
+    ($start:block, $end:block) => {
+        FunctionalCommand::new(move || $start, || Ok(()), move || $end, || Ok(false), vec![])
+    };
+    ($start:block, $end:block, $($requirement:expr),+ $(,)?) => {
+        FunctionalCommand::new(
+            move || $start,
+            || Ok(()),
+            move |_| $end,
+            || Ok(false), 
+            vec![$($requirement),+],
+        )
+    };
+}
+
+#[macro_export]
+macro_rules! run_end {
+    ($execute:block, $end:block) => {
+        FunctionalCommand::new(|| Ok(()), move || $execute, move |_| $end, || Ok(false), vec![])
+    };
+    ($execute:block, $end:block, $($requirement:expr),+ $(,)?) => {
+        FunctionalCommand::new(|| Ok(()), move || $execute, move |_| $end, || Ok(false), vec![$($requirement),+],)
+    };
 }

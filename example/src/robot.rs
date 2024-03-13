@@ -3,16 +3,11 @@ use core::cell::RefCell;
 use pros::devices::Controller;
 use pros::devices::controller::ControllerButton;
 
-use pros_command::{
-    command::{FunctionalCommand},
-    robot::ScheduledRobot,
-    subsystem::Subsystem,
-    CommandScheduler,
-};
+use pros_command::{command::{FunctionalCommand}, robot::ScheduledRobot, subsystem::Subsystem, CommandScheduler, run_once};
 use pros::prelude::*;
 use pros_command::controller::Trigger;
 
-use crate::{commands::DriveWithJoystickCommand, subsystems::drivetrain::Drivetrain};
+use crate::subsystems::drivetrain::{DriveWithJoystickCommand, Drivetrain};
 
 pub struct Robot {
     drivetrain: Rc<RefCell<Drivetrain>>,
@@ -27,26 +22,18 @@ impl Robot {
 
     pub fn configure_button_bindings(&mut self) {
         CommandScheduler::set_default_command(
-            &self.drivetrain,
-            DriveWithJoystickCommand::new(self.drivetrain.clone(), Controller::Master),
+            &self.drivetrain.clone().into(),
+            DriveWithJoystickCommand::new(self.drivetrain.clone(), Controller::Master).into()
         )
         .unwrap();
 
         Trigger::button(Controller::Master, ControllerButton::A)
-            .on_true(FunctionalCommand::instant(
-                || {
+            .on_true(run_once!({
                     println!("Button A pressed");
-                    Ok(())
-                },
-                vec![],
-            ))
-            .on_false(FunctionalCommand::instant(
-                || {
+                }))
+            .on_false(run_once!({
                     println!("Button A released");
-                    Ok(())
-                },
-                vec![],
-            ));
+                }));
     }
 }
 

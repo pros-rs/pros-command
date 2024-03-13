@@ -2,18 +2,15 @@ use alloc::{boxed::Box, rc::Rc, vec};
 use core::{cell::RefCell, fmt::Debug};
 use pros::prelude::*;
 
-use crate::{
-    command::{Command, FunctionalCommand},
-    CommandScheduler, SubsystemRef,
-};
+use crate::{command::{Command, FunctionalCommand}, AnyCommand, CommandScheduler, AnySubsystem, run_once, run, start_end, run_end};
 
 /// A collection of robot parts and other hardware that act together as a whole.
 pub trait Subsystem: Debug {
     /// This method will be called once per scheduler run
-    fn periodic(&mut self) {}
+    fn periodic(&mut self, ctx: AnySubsystem) {}
     /// This method will be called once per scheduler run, but only during simulation
-    fn sim_periodic(&mut self) {}
-    fn default_command(&self) -> Option<Box<dyn Command>> {
+    fn sim_periodic(&mut self, ctx: AnySubsystem) {}
+    fn default_command(&self, ctx: AnySubsystem) -> Option<AnyCommand> {
         None
     }
 
@@ -25,46 +22,66 @@ pub trait Subsystem: Debug {
     }
 }
 
-pub trait SubsystemRefExt<T>
-where
-    T: Subsystem,
-{
+pub trait SubsystemRefExt {
     fn run_once(&self, action: impl FnMut() -> Result + 'static) -> FunctionalCommand;
     fn run(&self, action: impl FnMut() -> Result + 'static) -> FunctionalCommand;
     fn start_end(
         &self,
         start: impl FnMut() -> Result + 'static,
-        end: impl FnMut(bool) -> Result + 'static,
+        end: impl FnMut() -> Result + 'static,
     ) -> FunctionalCommand;
     fn run_end(
         &self,
         run: impl FnMut() -> Result + 'static,
-        end: impl FnMut(bool) -> Result + 'static,
+        end: impl FnMut() -> Result + 'static,
     ) -> FunctionalCommand;
 }
 
-impl<T> SubsystemRefExt<T> for Rc<RefCell<T>>
-where
-    T: Subsystem + 'static,
+impl<T> SubsystemRefExt for Rc<RefCell<T>>
+    where
+        T: Subsystem + 'static,
 {
-    fn run_once(&self, action: impl FnMut() -> Result + 'static) -> FunctionalCommand {
-        FunctionalCommand::instant(action, vec![SubsystemRef(self.clone())])
+    fn run_once(&self, mut action: impl FnMut() -> Result + 'static) -> FunctionalCommand {
+        run_once!({ action() }, AnySubsystem(self.clone()))
     }
-    fn run(&self, action: impl FnMut() -> Result + 'static) -> FunctionalCommand {
-        FunctionalCommand::run(action, vec![SubsystemRef(self.clone())])
+    fn run(&self, mut action: impl FnMut() -> Result + 'static) -> FunctionalCommand {
+        run!({ action() }, AnySubsystem(self.clone()))
     }
     fn start_end(
         &self,
-        start: impl FnMut() -> Result + 'static,
-        end: impl FnMut(bool) -> Result + 'static,
+        mut start: impl FnMut() -> Result + 'static,
+        mut end: impl FnMut() -> Result + 'static,
     ) -> FunctionalCommand {
-        FunctionalCommand::start_end(start, end, vec![SubsystemRef(self.clone())])
+        start_end!({ start() }, { end() }, AnySubsystem(self.clone()))
     }
     fn run_end(
         &self,
-        run: impl FnMut() -> Result + 'static,
-        end: impl FnMut(bool) -> Result + 'static,
+        mut run: impl FnMut() -> Result + 'static,
+        mut end: impl FnMut() -> Result + 'static,
     ) -> FunctionalCommand {
-        FunctionalCommand::run_end(run, end, vec![SubsystemRef(self.clone())])
+        run_end!({ run() }, { end() }, AnySubsystem(self.clone()))
+    }
+}
+
+impl SubsystemRefExt for AnySubsystem {
+    fn run_once(&self, mut action: impl FnMut() -> Result + 'static) -> FunctionalCommand {
+        run_once!({ action() }, self.clone())
+    }
+    fn run(&self, mut action: impl FnMut() -> Result + 'static) -> FunctionalCommand {
+        run!({ action() }, self.clone())
+    }
+    fn start_end(
+        &self,
+        mut start: impl FnMut() -> Result + 'static,
+        mut end: impl FnMut() -> Result + 'static,
+    ) -> FunctionalCommand {
+        start_end!({ start() }, { end() }, self.clone())
+    }
+    fn run_end(
+        &self,
+        mut run: impl FnMut() -> Result + 'static,
+        mut end: impl FnMut() -> Result + 'static,
+    ) -> FunctionalCommand {
+        run_end!({ run() }, { end() }, self.clone())
     }
 }
